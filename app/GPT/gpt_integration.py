@@ -133,7 +133,6 @@ PRODUCT_PRICE_PATTERN = [
     r'\bvalor\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*(.*)\b'
 ]
 
-
 RECOMMEND_PRODUCT_PATTERNS = {
     "drink": [
         r'\bbebida recomendada\b', r'\bqu[eé] bebida recomiendas\b', r'\bqu[eé] bebida me recomiendas\b',
@@ -195,7 +194,16 @@ async def handle_common_responses(update: Update, patterns, response_text):
     return False
 
 
-EXIT_PATTERNS = [r'\bsalir\b', r'\bsalir del chat\b', r'\bterminar\b']
+EXIT_PATTERNS = [
+    r'\bsalir\b', r'\bsalir del chat\b', r'\bterminar\b', r'\bterminar chat\b', r'\badi[oó]s\b', r'\bchao\b',
+    r'\bnos vemos\b', r'\bhasta luego\b', r'\bnos vemos luego\b', r'\bfinalizar\b', r'\bfinalizar chat\b',
+    r'\bcerrar chat\b', r'\bterminar conversaci[oó]n\b', r'\bterminar chat\b', r'\bes todo\b', r'\bfin\b',
+    r'\bfin del chat\b', r'\bfin de la conversaci[oó]n\b', r'\bfin de la conversación\b',
+    r'\bes todo gracias\b', r'\bno necesito nada m[aá]s\b', r'\bno necesito ayuda\b',
+    r'\bno necesito nada m[aá]s por ahora\b', r'\bno necesito nada m[aá]s gracias\b',
+    r'\bno necesito nada m[aá]s por el momento\b', r'\bsolo eso\b', r'\bgracias\b', r'\bhasta aqu[ií]\b',
+    r'\bhasta aqu[ií] llegamos\b'
+]
 
 
 # Función para verificar si un mensaje coincide con algún patrón
@@ -362,6 +370,12 @@ async def handle_response_by_price(update: Update, patterns, handler_function):
 # Función para manejar la respuesta basada en el patrón detectado por categoría
 async def handle_response_by_category(update: Update, patterns, handler_function):
     message = update.message.text.lower()
+
+    # Verificar si el mensaje es más específico que una simple categoría
+    specific_product_match = re.search(r'\b(?:una|un|el|la|una|el|la)\s+([\w\s]+(?:\s+de\s+\w+)+)\b', message)
+    if specific_product_match:
+        logger.info("Specific product detected, skipping category mapping.")
+        return False  # Saltar la detección de categorías si se encuentra un producto específico
 
     # Mapeo de palabras clave a categorías específicas, asegurando que las más específicas se revisen primero
     category_keywords = {
