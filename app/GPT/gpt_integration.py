@@ -169,6 +169,7 @@ RECOMMEND_PRODUCT_PATTERNS = {
         r'\balmuerzo recomendado\b', r'\bqu[eé] almuerzo recomiendas\b', r'\bqu[eé] almuerzo me recomiendas\b',
         r'\bcu[aá]l es el plato m[aá]s popular\b', r'\bcu[aá]l es el plato m[aá]s vendido\b',
         r'\bcu[aá]l es el plato m[aá]s pedido\b',
+        r'\bqu[eé] plato me recomiendas\b',
         r'\bqu[eé] almuerzo es bueno\b', r'\bqu[eé] almuerzo econ[oó]mico me recomiendas\b',
         r'\bqu[eé] almuerzo es bueno y econ[oó]mico\b',
         r'\bdeseo un almuerzo\b', r'\bqu[eé] almuerzo me recomiendas\b',
