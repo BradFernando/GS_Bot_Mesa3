@@ -238,7 +238,7 @@ async def handle_response_by_name(update, handler_function):
 
     # Extracción directa del nombre del producto evitando categorías comunes
     match = re.search(
-        r'\b(?:tienes|quiero|dame|quisiera|necesito|me\s+gustar[ií]a(?:\s+pedir|ordenar)?|deseo)\s+(?:una|un|la|el)\s+(?!desayuno|almuerzo|segundo|entrada|snack|postre\b)([\w\s]+)\b',
+        r'\b(?:tienes|quiero|dame|quisiera|necesito|me\s+puedes\s+ayudar\s+con|me\s+gustar[ií]a(?:\s+pedir|ordenar)?|deseo)\s+(?:una|un|la|el)\s+(?!desayuno|almuerzo|segundo|entrada|snack|postre\b)([\w\s]+)\b',
         message
     )
 
