@@ -244,9 +244,9 @@ def normalize_product_name(product_name):
 async def handle_response_by_name(update, handler_function):
     message = update.message.text.lower()
 
-    # Expresión regular ajustada
+    # Expresión regular ajustada para detectar diferentes tipos de solicitudes
     match = re.search(
-        r'\b(?:tienes|quiero|dame|quisiera|necesito|me\s+puedes\s+ayudar\s+con|me\s+gustar[ií]a(?:\s+pedir|ordenar)?|deseo|y)\s+(?:una|un|la|el)\s+(?!desayuno|almuerzo|segundo|entrada|snack|postre\b)([\w\s]+)\b',
+        r'\b(?:tienes|quiero|dame|quisiera|necesito|me\s+puedes\s+ayudar\s+con|me\s+gustar[ií]a(?:\s+pedir|ordenar)?|deseo|y|recomi[eé]ndame\s+algo\s+que\s+tenga)\s+(?:una|un|la|el)?\s*(?!desayuno|almuerzo|segundo|entrada|snack|postre\b)([\w\s]+)\b',
         message,
         re.IGNORECASE
     )
