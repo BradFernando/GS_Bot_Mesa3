@@ -123,12 +123,13 @@ PRODUCT_QUANTITY_PATTERN = [
 
 # Patrones de expresión regular para consultar el precio por nombre de producto
 PRODUCT_PRICE_PATTERN = [
-    r'\bcu[aá]nto\s+(?:cuesta|vale|valen|cuestan)\s+(?:el|la|los|las)?\s*([a-zA-Z\s]+)\b',
-    r'\bqu[eé]\s+(?:precio|valor|costo)\s+(?:tiene|tienen)\s+(?:el|la|los|las)?\s*([a-zA-Z\s]+)\b',
-    r'\bprecio\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*([a-zA-Z\s]+)\b',
-    r'\bcosto\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*([a-zA-Z\s]+)\b',
-    r'\bvalor\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*([a-zA-Z\s]+)\b'
+    r'\bcu[aá]nto\s+(?:cuesta|vale|valen|cuestan)\s+(?:el|la|los|las)?\s*(.*)\b',
+    r'\bqu[eé]\s+(?:precio|valor|costo)\s+(?:tiene|tienen)\s+(?:el|la|los|las)?\s*(.*)\b',
+    r'\bprecio\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*(.*)\b',
+    r'\bcosto\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*(.*)\b',
+    r'\bvalor\s+(?:del|de\s+la|de\s+los|de\s+las)?\s*(.*)\b'
 ]
+
 
 RECOMMEND_PRODUCT_PATTERNS = {
     "drink": [
@@ -331,9 +332,18 @@ async def handle_response_by_price(update: Update, patterns, handler_function):
         match = re.search(pattern, message)
         if match:
             try:
-                product_name = match.group(1).strip().title()
+                # Extraemos el nombre del producto y eliminamos artículos como "una", "un", "el", "la"
+                product_name = match.group(1).strip()
+                # Eliminamos artículos comunes que podrían estar al principio del nombre del producto
+                product_name = re.sub(r'^(una|un|el|la|los|las)\s+', '', product_name, flags=re.IGNORECASE)
+                product_name = product_name.title()
+
                 logger.info(f"Product name extracted: {product_name}")
+
+                # Creamos un objeto de consulta simulado para la función del controlador
                 fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+
+                # Llamamos a la función del controlador con la consulta simulada
                 await handler_function(fake_query, product_name)
                 return True
             except IndexError:
@@ -344,7 +354,6 @@ async def handle_response_by_price(update: Update, patterns, handler_function):
     return False
 
 
-# Función para manejar la respuesta basada en el patrón detectado por categoría
 # Función para manejar la respuesta basada en el patrón detectado por categoría
 async def handle_response_by_category(update: Update, patterns, handler_function):
     message = update.message.text.lower()
@@ -418,7 +427,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     })
 
     # Verificar si el mensaje coincide con saludos o preguntas comunes
-    if await handle_common_responses(update, GREETING_PATTERNS, "¡Hola! ¿Cómo puedo ayudarte hoy?"):
+    if await handle_common_responses(update, GREETING_PATTERNS, "¡Hola Bienvenido al Costeñito! ¿Cómo puedo ayudarte "
+                                                                "hoy?"):
         return
 
     # Verificar si el mensaje coincide con los patrones de salida

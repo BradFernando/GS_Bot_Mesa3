@@ -84,8 +84,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     chat_id = query.message.chat_id
 
+    # Si 'session_closed' no está definido, se asume que la sesión está cerrada
+    if "session_closed" not in context.chat_data:
+        context.chat_data["session_closed"] = True
+
+    query = update.callback_query
+    await query.answer()
+    logger.info(f"Callback data received: {query.data}")
+
     # Verificar si la sesión está cerrada
-    if context.chat_data.get("session_closed", False):
+    if context.chat_data.get("session_closed", True):
         await query.message.reply_text("La sesión ha terminado. Para empezar de nuevo, escribe /start.")
         return
 
@@ -140,6 +148,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def run_bot():
     application = Application.builder().token(settings.bot_token).build()
+
+    # Establecer session_closed como True por defecto para todos los usuarios
+    application.chat_data_defaults = {"session_closed": True}
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

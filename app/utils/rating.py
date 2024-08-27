@@ -29,6 +29,7 @@ async def handle_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "Califica nuestro sistema y tu experiencia:\n1. ⭐️\n2. ⭐️⭐️\n3. ⭐️⭐️⭐️\n4. ⭐️⭐️⭐️⭐️\n5. ⭐️⭐️⭐️⭐️⭐️"
     )
     context.user_data['awaiting_rating'] = True
+    await update.message.reply_text("Gracias por tu calificación. La sesión ha terminado.")
 
 
 async def handle_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
