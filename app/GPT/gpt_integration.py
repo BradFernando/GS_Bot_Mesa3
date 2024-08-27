@@ -42,6 +42,9 @@ MENU_PATTERNS = [
 MOST_ORDERED_PRODUCT_PATTERNS = [
     r'\bproducto m[aá]s pedido\b', r'\borden m[aá]s pedida\b', r'\bproducto m[aá]s vendido\b',
     r'\borden m[aá]s vendida\b', r'\bcu[aá]l es el producto más pedido\b', r'\bcu[aá]l es el producto m[aá]s popular\b',
+    r'\bcu[aá]l es el producto m[aá]s vendido\b', r'\bcu[aá]l es la orden m[aá]s pedida\b',
+    r'\bcu[aá]l es el pedido m[aá]s popular\b', r'\bcu[aá]l es la venta m[aá]s popular\b',
+    r'\bcu[aá]l es la orden m[aá]s vendida\b', r'\bcu[aá]l es la venta m[aá]s vendida\b',
 ]
 
 MOST_SOLD_DRINK_PATTERNS = [
