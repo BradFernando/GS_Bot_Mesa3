@@ -348,6 +348,7 @@ async def handle_response_by_quantity(update: Update, patterns, handler_function
 
 
 # Función para manejar la respuesta basada en el patrón detectado por cantidad
+# Función para manejar la respuesta basada en el patrón detectado por cantidad de producto
 async def handle_response_by_quantityofproduct(update: Update, patterns, handler_function):
     message = update.message.text.lower()
     for pattern in patterns:
@@ -356,15 +357,51 @@ async def handle_response_by_quantityofproduct(update: Update, patterns, handler
             try:
                 product_name = match.group(1).strip().title()
                 logger.info(f"Product name extracted: {product_name}")
-                fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
-                await handler_function(fake_query, product_name)
-                return True
+
+                # Normalizar el nombre del producto
+                normalized_product_name = normalize_product_name(product_name)
+                logger.info(f"Normalized product name: {normalized_product_name}")
+
+                async with SessionLocal() as session:
+                    async with session.begin():
+                        # Búsqueda exacta en la base de datos
+                        query = select(Product.name).where(Product.name.ilike(f'%{normalized_product_name}%'))
+                        result = await session.execute(query)
+                        products = result.scalars().all()
+
+                        # Si no se encuentran coincidencias exactas, usar Fuzzywuzzy para buscar coincidencias aproximadas
+                        if not products:
+                            query_all = select(Product.name)
+                            all_products = await session.execute(query_all)
+                            all_products_list = all_products.scalars().all()
+
+                            # Convertir todos los nombres de productos a minúsculas para comparación
+                            all_products_list_lower = [product.lower() for product in all_products_list]
+
+                            # Encontrar el producto más similar usando Fuzzywuzzy
+                            best_match = process.extractOne(normalized_product_name, all_products_list_lower)
+
+                            if best_match and best_match[1] > 70:  # Umbral de similitud de 70
+                                # Encontrar el producto original en la lista utilizando el índice de coincidencia
+                                matched_product_index = all_products_list_lower.index(best_match[0])
+                                matched_product = all_products_list[matched_product_index]
+                                products = [matched_product]
+
+                if products:
+                    # Usar el nombre del producto tal como se encuentra en la base de datos (capitalizado correctamente)
+                    product_name_to_use = products[0]
+                    logger.info(f"Producto encontrado en la base de datos: {product_name_to_use}")
+                    fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+                    await handler_function(fake_query, product_name_to_use)
+                    return True
+
             except IndexError:
                 logger.error("No such group in pattern matching")
                 continue
         else:
             logger.info("No se encontraron mensajes de cantidad, saltando...")
     return False
+
 
 
 # Función para manejar la respuesta basada en el patrón detectado por precio
