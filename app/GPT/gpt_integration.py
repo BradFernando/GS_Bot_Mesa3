@@ -113,9 +113,7 @@ PRODUCT_BY_NAME_PATTERN = [
 
 # Patrones de expresión regular para extraer la cantidad y el nombre del producto
 PRODUCT_ORDER_PATTERN = [
-    r'\bquiero\s+(-?\d+)\s+(\w+)',  # Captura solo una palabra después del número
-    r'\bquisiera\s+(-?\d+)\s+(\w+)',
-    r'\bnecesito\s+(-?\d+)\s+(\w+)'
+    r'\b(?:quiero|quisiera|necesito)\s+(\d+)\s+(.*)',  # Captura varias palabras después del número
 ]
 
 # Patrones de expresión regular para consultar la cantidad de un producto
@@ -227,6 +225,9 @@ async def handle_response(update, patterns, handler_function):
 
 # Función para normalizar el nombre del producto
 def normalize_product_name(product_name):
+    """
+    Normaliza el nombre del producto para facilitar la búsqueda en la base de datos.
+    """
     # Convertir a minúsculas y quitar acentos
     product_name = product_name.lower()
     product_name = re.sub(r'[áàäâ]', 'a', product_name)
@@ -236,8 +237,13 @@ def normalize_product_name(product_name):
     product_name = re.sub(r'[úùüû]', 'u', product_name)
     product_name = re.sub(r'[^a-z0-9\s]', '', product_name)
 
+    # Eliminar pluralizaciones comunes en español y artículos al principio del nombre
+    product_name = re.sub(r'\b(el|la|los|las|una|un|unos|unas)\b\s*', '', product_name)
+    product_name = re.sub(r'(\w+)s\b', r'\1', product_name)  # Pluralización simple ('limonadas' a 'limonada')
+    product_name = re.sub(r'(\w+)es\b', r'\1', product_name)  # Pluralización con 'es' ('naranjas' a 'naranja')
+
     # Devolver el nombre normalizado
-    return product_name
+    return product_name.strip()
 
 
 # Función para manejar la respuesta basada en el patrón detectado por nombre
@@ -251,7 +257,6 @@ async def handle_response_by_name(update, handler_function):
         re.IGNORECASE
     )
 
-    # Resultados de la búsqueda
     if match:
         product_name = match.group(1).strip()
 
@@ -266,7 +271,6 @@ async def handle_response_by_name(update, handler_function):
                 result = await session.execute(query)
                 products = result.scalars().all()
 
-                # Si no se encuentran coincidencias exactas, buscar productos similares
                 if not products:
                     # Implementar una búsqueda más difusa si no hay coincidencias exactas
                     query_all = select(Product.name)
@@ -275,11 +279,11 @@ async def handle_response_by_name(update, handler_function):
 
                     # Encontrar el producto más similar usando fuzzywuzzy
                     best_match = process.extractOne(normalized_product_name, all_products_list)
-                    if best_match and best_match[1] > 70:  # Umbral de similitud
+                    if best_match and best_match[1] > 85:  # Aumentar el umbral de similitud
                         products = [best_match[0]]
 
         if products:
-            product_name_to_use = products[0]  # Usar solo el primer producto encontrado
+            product_name_to_use = products[0]
             logger.info(f"Producto encontrado en la base de datos: {product_name_to_use}")
             fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
             await handler_function(fake_query, product_name_to_use)
@@ -298,17 +302,42 @@ async def handle_response_by_quantity(update: Update, patterns, handler_function
             try:
                 # Extraer la cantidad y el nombre del producto
                 product_quantity = int(match.group(1).strip())
-                product_name = match.group(2).strip().title()
+                product_name = match.group(2).strip().lower()
 
                 logger.info(f"Product quantity extracted: {product_quantity}")
                 logger.info(f"Product name extracted: {product_name}")
 
-                # Crear un objeto de consulta simulado para la función del controlador
-                fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+                # Normalizar el nombre del producto antes de la búsqueda
+                normalized_product_name = normalize_product_name(product_name)
+                logger.info(f"Normalized product name: {normalized_product_name}")
 
-                # Llamar a la función del controlador con la consulta simulada
-                await handler_function(fake_query, product_name, product_quantity)
-                return True
+                async with SessionLocal() as session:
+                    async with session.begin():
+                        # Búsqueda flexible con ILIKE
+                        query = select(Product.name).where(Product.name.ilike(f'%{normalized_product_name}%'))
+                        result = await session.execute(query)
+                        products = result.scalars().all()
+
+                        # Si no se encuentran coincidencias exactas, buscar productos similares
+                        if not products:
+                            # Implementar una búsqueda más difusa si no hay coincidencias exactas
+                            query_all = select(Product.name)
+                            all_products = await session.execute(query_all)
+                            all_products_list = all_products.scalars().all()
+
+                            # Encontrar el producto más similar usando fuzzywuzzy
+                            best_match = process.extractOne(normalized_product_name, all_products_list)
+                            if best_match and best_match[1] > 70:  # Umbral de similitud
+                                products = [best_match[0]]
+
+                if products:
+                    # Usar el nombre del producto tal como se encuentra en la base de datos (capitalizado correctamente)
+                    product_name_to_use = products[0]
+                    logger.info(f"Producto encontrado en la base de datos: {product_name_to_use}")
+                    fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+                    await handler_function(fake_query, product_name_to_use, product_quantity)
+                    return True
+
             except ValueError:
                 logger.error(f"Cantidad no válida extraída: {match.group(1)}")
                 await update.message.reply_text("Por favor, proporciona una cantidad válida.")
@@ -455,6 +484,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await handle_rating(update, context)
         return
 
+    # *** MOVEMOS LA DETECCIÓN DE CANTIDAD PRIMERO ***
+
+    # 4. Manejar cantidades de productos
+    if await handle_response_by_quantity(update, PRODUCT_ORDER_PATTERN, show_product_stock_by_name):
+        return
+
+    # 5. Manejar cantidad por producto
+    if await handle_response_by_quantityofproduct(update, PRODUCT_QUANTITY_PATTERN, show_product_stock_by_productname):
+        return
+
+    # 6. Manejar precios de productos
+    if await handle_response_by_price(update, PRODUCT_PRICE_PATTERN, show_product_price_by_name):
+        return
+
     # 1. Verificar si corresponde a una acción específica
     pattern_handlers = [
         (MENU_PATTERNS, show_categories),
@@ -484,18 +527,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # 3. Si no es una categoría, verificar si es un producto específico
     if await handle_response_by_name(update, show_product_by_name):
-        return
-
-    # 4. Manejar cantidades de productos
-    if await handle_response_by_quantity(update, PRODUCT_ORDER_PATTERN, show_product_stock_by_name):
-        return
-
-    # 5. Manejar cantidad por producto
-    if await handle_response_by_quantityofproduct(update, PRODUCT_QUANTITY_PATTERN, show_product_stock_by_productname):
-        return
-
-    # 6. Manejar precios de productos
-    if await handle_response_by_price(update, PRODUCT_PRICE_PATTERN, show_product_price_by_name):
         return
 
     # 7. Si no coincide con nada relacionado a productos o categorías, usar GPT para manejo de conversación general
