@@ -49,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     greeting_message = responses["greeting_message"].format(
         greeting=greeting,
         user_first_name=user_first_name,
-        chat_id=f"{chat_id}",
+        chat_id=f"`{chat_id}`",
         bot_name=bot_name
     )
 
