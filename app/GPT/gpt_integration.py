@@ -348,7 +348,6 @@ async def handle_response_by_quantity(update: Update, patterns, handler_function
     return False
 
 
-# Función para manejar la respuesta basada en el patrón detectado por cantidad
 # Función para manejar la respuesta basada en el patrón detectado por cantidad de producto
 async def handle_response_by_quantityofproduct(update: Update, patterns, handler_function):
     message = update.message.text.lower()
@@ -404,7 +403,6 @@ async def handle_response_by_quantityofproduct(update: Update, patterns, handler
     return False
 
 
-
 # Función para manejar la respuesta basada en el patrón detectado por precio
 async def handle_response_by_price(update: Update, patterns, handler_function):
     message = update.message.text.lower()
@@ -412,22 +410,43 @@ async def handle_response_by_price(update: Update, patterns, handler_function):
         match = re.search(pattern, message)
         if match:
             try:
-                # Extraemos el nombre del producto y eliminamos artículos como "una", "un", "el", "la"
+                # Extraemos el nombre del producto y normalizamos
                 product_name = match.group(1).strip()
-                # Eliminamos artículos comunes que podrían estar al principio del nombre del producto
-                product_name = re.sub(r'^(una|un|el|la|los|las)\s+', '', product_name, flags=re.IGNORECASE)
-                product_name = product_name.title()
+                normalized_product_name = normalize_product_name(product_name)  # Normalización
 
-                logger.info(f"Product name extracted: {product_name}")
+                logger.info(f"Normalized product name for price query: {normalized_product_name}")
 
-                # Creamos un objeto de consulta simulado para la función del controlador
-                fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+                # Realizar la búsqueda en la base de datos
+                async with SessionLocal() as session:
+                    async with session.begin():
+                        # Búsqueda exacta primero
+                        query = select(Product.name).where(Product.name.ilike(f'%{normalized_product_name}%'))
+                        result = await session.execute(query)
+                        products = result.scalars().all()
 
-                # Llamamos a la función del controlador con la consulta simulada
-                await handler_function(fake_query, product_name)
-                return True
-            except IndexError:
-                logger.error("No such group in pattern matching")
+                        if not products:
+                            # Implementar una búsqueda más difusa si no hay coincidencias exactas
+                            query_all = select(Product.name)
+                            all_products = await session.execute(query_all)
+                            all_products_list = all_products.scalars().all()
+
+                            # Encontrar el producto más similar usando fuzzywuzzy
+                            best_match = process.extractOne(normalized_product_name, all_products_list)
+                            if best_match and best_match[1] > 70:  # Umbral de similitud
+                                products = [best_match[0]]
+
+                if products:
+                    product_name_to_use = products[0]
+                    logger.info(f"Producto encontrado en la base de datos: {product_name_to_use}")
+                    fake_query = type('FakeQuery', (object,), {'edit_message_text': update.message.reply_text})
+                    await handler_function(fake_query, product_name_to_use)
+                    return True
+                else:
+                    await update.message.reply_text("No se encontró un producto similar en la base de datos.")
+                    return False
+
+            except Exception as e:
+                logger.error(f"Error manejando la respuesta por precio: {e}")
                 continue
         else:
             logger.info("No se encontraron mensajes de precios, saltando...")
